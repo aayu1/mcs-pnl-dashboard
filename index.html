@@ -343,6 +343,27 @@ function buildFY() {
 }
 
 // ── DATA LOAD ──────────────────────────────────────────────────
+async function fetchWithRetry(url, maxAttempts=3) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      document.getElementById('load-msg').textContent =
+        attempt === 1 ? 'Connecting to Google Sheet…'
+                      : `Retrying… (attempt ${attempt} of ${maxAttempts})`;
+      // Apps Script redirects — must follow; no-store ensures fresh fetch
+      const res = await fetch(url, { redirect: 'follow', cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const d = await res.json();
+      if (!d.monthly) throw new Error('Empty response');
+      return d;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      // Wait before retrying (cold-start / transient CORS issue)
+      document.getElementById('load-msg').textContent = `Waiting before retry…`;
+      await new Promise(r => setTimeout(r, 1500 * attempt));
+    }
+  }
+}
+
 async function loadData(forceRefresh=false) {
   document.getElementById('refresh-btn').disabled = true;
   document.getElementById('refresh-btn').textContent = '…';
@@ -354,38 +375,42 @@ async function loadData(forceRefresh=false) {
   }
 
   try {
-    const url = SCRIPT_URL + (forceRefresh ? '?action=refresh&t='+Date.now() : '?t='+Date.now());
-    document.getElementById('load-msg').textContent = 'Fetching live data from Google Sheet…';
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP '+res.status);
-    const d = await res.json();
-    if (!d.monthly || !d.monthly.length) throw new Error('No data returned');
+    // Append a fresh timestamp so Apps Script doesn't return 304
+    const qs = (forceRefresh ? 'action=refresh&' : '') + 't=' + Date.now();
+    const d  = await fetchWithRetry(SCRIPT_URL + '?' + qs);
 
     MONTHLY = d.monthly;
-    BRANDS  = d.brands;
+    BRANDS  = d.brands || [];
     buildFY();
 
     document.getElementById('loading-screen').classList.add('hidden');
+    document.getElementById('error-screen').classList.add('hidden');
 
     const syncTime = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
     document.getElementById('sync-time').textContent = 'Synced ' + syncTime;
-    const badge = document.getElementById('cached-badge');
-    badge.style.display = d.cached ? 'inline' : 'none';
+    document.getElementById('cached-badge').style.display = d.cached ? 'inline' : 'none';
 
     const fyRange = fyList.join(' · ');
-    document.getElementById('sb-foot').innerHTML = `Live sync from Google Sheet<br>${fyRange} · ${MONTHLY.length} months`;
-    document.getElementById('tb-sub').textContent = fyRange + ' · ' + MONTHLY.length + ' months';
+    document.getElementById('sb-foot').innerHTML =
+      'Live sync from Google Sheet<br>' + fyRange + ' · ' + MONTHLY.length + ' months';
+    document.getElementById('tb-sub').textContent =
+      fyRange + ' · ' + MONTHLY.length + ' months';
 
     renderAll();
 
   } catch(err) {
-    if (isFirstLoad) {
-      document.getElementById('loading-screen').classList.add('hidden');
+    document.getElementById('loading-screen').classList.add('hidden');
+    if (isFirstLoad || forceRefresh) {
       document.getElementById('error-screen').classList.remove('hidden');
-      document.getElementById('err-msg').textContent = err.message + ' — Make sure SCRIPT_URL is set and the Web App is deployed as "Anyone" can access.';
+      document.getElementById('err-msg').textContent =
+        'Could not reach the Apps Script after 3 attempts. ' +
+        'Common fixes:\n• Open the Script URL directly in a browser — if it asks to sign in, sign in once.\n' +
+        '• In Apps Script → Deploy → Manage Deployments → confirm "Who has access" is Anyone.\n' +
+        '• Error detail: ' + err.message;
     } else {
-      document.getElementById('sync-time').textContent = 'Sync failed';
+      document.getElementById('sync-time').textContent = 'Sync failed — click ↺';
     }
+    if (MONTHLY.length) renderAll(); // show stale data if we have it
   }
 
   document.getElementById('refresh-btn').disabled = false;
@@ -695,12 +720,16 @@ document.querySelectorAll('.nav-item').forEach(btn=>{
 setInterval(()=>loadData(), 5*60*1000);
 
 // ── INIT ──────────────────────────────────────────────────────
-if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbzHSp8sCd-3UvMO16toYooNp5RJ50NanTvJFIzRo2o0EdonhPRuzEdaVHgnBAsKb6ws/exec') {
+if (!SCRIPT_URL || SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') {
   document.getElementById('loading-screen').classList.add('hidden');
   document.getElementById('error-screen').classList.remove('hidden');
-  document.getElementById('err-msg').textContent = 'SCRIPT_URL is not set. Open pnl-dashboard.html, find the line that says SCRIPT_URL = \'YOUR_APPS_SCRIPT_URL_HERE\' and replace it with your deployed Apps Script URL.';
+  document.getElementById('err-msg').textContent =
+    'SCRIPT_URL is not set. Find the line:\n' +
+    'const SCRIPT_URL = \'YOUR_APPS_SCRIPT_URL_HERE\';\n' +
+    'and replace with your deployed Apps Script URL.';
 } else {
-  loadData();
+  // Small initial delay avoids hitting Apps Script mid-cold-start
+  setTimeout(() => loadData(), 300);
 }
 </script>
 </body>
