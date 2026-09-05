@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>MCS Media — P&L Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sb:#0F172A;--amber:#F59E0B;--green:#059669;--red:#DC2626;
+  --blue:#2563EB;--purple:#7C3AED;--teal:#0891B2;
+  --bg:#F0F4F8;--card:#fff;--border:#E2E8F0;
+  --text:#0F172A;--text2:#64748B;--text3:#94A3B8;
+  --shadow:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden}
+
+/* ── SIDEBAR ── */
+#sidebar{width:220px;min-width:220px;background:var(--sb);display:flex;flex-direction:column;height:100vh;flex-shrink:0}
+.sb-logo{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,.06)}
+.sb-logo-name{font-weight:900;font-size:17px;color:var(--amber);letter-spacing:-.3px}
+.sb-logo-sub{font-size:10px;color:#475569;margin-top:3px;letter-spacing:.3px}
+.sb-nav{flex:1;padding:10px 0}
+.nav-item{width:100%;text-align:left;padding:10px 18px;border:none;border-left:3px solid transparent;background:none;color:#64748B;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;font-family:inherit;transition:all .15s}
+.nav-item.active{background:rgba(245,158,11,.12);border-left-color:var(--amber);color:var(--amber);font-weight:700}
+.nav-item:hover:not(.active){color:#94A3B8}
+.nav-item .ni{font-size:15px;flex-shrink:0}
+.sb-foot{padding:12px 18px;border-top:1px solid rgba(255,255,255,.06);font-size:10px;color:#334155}
+
+/* ── MAIN ── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:100vh}
+.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:12px 22px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:10px}
+.tb-title{font-size:16px;font-weight:800;color:var(--text)}
+.tb-sub{font-size:11px;color:var(--text3)}
+.fy-pills{display:flex;gap:6px}
+.fy-pill{font-size:10px;font-weight:700;padding:3px 10px;border-radius:99px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--amber)}
+
+#content{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 20px 40px}
+
+/* ── TAB PANES ── */
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
+/* ── SECTION HEADER ── */
+.sec-h{font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:20px 0 12px;display:flex;align-items:center;gap:8px}
+.sec-h::after{content:'';flex:1;height:1px;background:var(--border)}
+.sec-h:first-child{margin-top:0}
+
+/* ── KPI CARDS ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:18px}
+.kpi-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.kpi{background:var(--card);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);border:1px solid var(--border);position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;background:var(--ac,var(--amber))}
+.kpi-lbl{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+.kpi-val{font-size:21px;font-weight:800;line-height:1.1}
+.kpi-sub{font-size:10px;color:var(--text3);margin-top:3px}
+
+/* ── COMPARE TILES (FY view) ── */
+.fy-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.fy-card{background:var(--card);border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.fy-card-title{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.fy-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #F8FAFC;font-size:13px}
+.fy-row:last-child{border-bottom:none;font-weight:700;padding-top:10px;margin-top:4px;border-top:1px solid var(--border)}
+.fy-row-lbl{color:var(--text2)}
+.fy-row-val{font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ── CHART CARDS ── */
+.chart-row{display:grid;gap:12px;margin-bottom:12px}
+.chart-row-2{grid-template-columns:1fr 1fr}
+.chart-row-3{grid-template-columns:2fr 1fr}
+.chart-card{background:var(--card);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.cc-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px}
+.cc-sub{font-size:10px;color:var(--text3);margin-bottom:12px}
+.cc-wrap{position:relative;width:100%}
+
+/* ── MONTH TABS ── */
+.month-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:16px;background:#F1F5F9;border-radius:10px;padding:4px;width:fit-content}
+.mtab{padding:6px 14px;border-radius:7px;border:none;background:none;color:#64748B;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;white-space:nowrap;transition:.15s}
+.mtab.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+/* ── FY FILTER TABS ── */
+.fy-tabs{display:flex;gap:5px;margin-bottom:16px}
+.fytab{padding:6px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);color:var(--text2);cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;transition:.15s}
+.fytab.active{background:var(--sb);color:var(--amber);border-color:var(--sb)}
+
+/* ── TABLE ── */
+.tbl-card{background:var(--card);border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden;margin-bottom:14px}
+.tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead tr{background:#F8FAFC}
+th{padding:9px 12px;text-align:left;font-size:9px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--border);white-space:nowrap}
+td{padding:9px 12px;border-top:1px solid #F8FAFC;white-space:nowrap}
+tr:hover td{background:#FAFAFA}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.bold{font-weight:700}
+.pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700}
+.pr{background:#FEE2E2;color:var(--red)}.pg{background:#D1FAE5;color:var(--green)}
+.pa{background:#FEF3C7;color:#92400E}
+
+/* ── DONUT LEGEND ── */
+.dl{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.dl-row{display:flex;align-items:center;justify-content:space-between;font-size:11px;gap:8px}
+.dl-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* ── MOBILE ── */
+@media(max-width:768px){
+  body{flex-direction:column;height:auto;min-height:100vh;overflow:auto}
+  #sidebar{width:100%;min-width:0;height:auto;flex-direction:row;position:fixed;bottom:0;left:0;right:0;z-index:200;box-shadow:0 -2px 10px rgba(0,0,0,.3);padding-bottom:env(safe-area-inset-bottom,0)}
+  .sb-logo,.sb-foot{display:none}
+  .sb-nav{display:flex;flex-direction:row;padding:0;overflow:hidden}
+  .nav-item{flex:1;flex-direction:column;align-items:center;justify-content:center;padding:6px 2px 8px;font-size:9px;gap:2px;border-left:none;border-top:3px solid transparent;text-align:center;min-width:0}
+  .nav-item.active{border-left-color:transparent;border-top-color:var(--amber)}
+  .nav-item .ni{font-size:18px;line-height:1}
+  .nav-item .nav-txt{display:block;overflow:hidden;text-overflow:ellipsis;max-width:60px}
+  #main{height:auto;padding-bottom:72px}
+  #content{overflow:visible;padding:12px 12px 30px}
+  .topbar{padding:10px 14px}
+  .tb-title{font-size:14px}
+  .kpi-grid,.kpi-grid-4{grid-template-columns:1fr 1fr;gap:8px}
+  .kpi{padding:11px 12px}
+  .kpi-val{font-size:17px}
+  .chart-row-2,.chart-row-3{grid-template-columns:1fr}
+  .fy-grid{grid-template-columns:1fr}
+  .month-tabs{width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}
+  .month-tabs::-webkit-scrollbar{display:none}
+  input,select{font-size:16px!important}
+}
+@media(max-width:380px){.kpi-val{font-size:15px}}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="sb-logo">
+    <div class="sb-logo-name">MCS Media</div>
+    <div class="sb-logo-sub">P&amp;L Dashboard</div>
+  </div>
+  <nav class="sb-nav">
+    <button class="nav-item active" data-tab="overview">  <span class="ni">📊</span><span class="nav-txt">Overview</span></button>
+    <button class="nav-item"        data-tab="monthly">   <span class="ni">📅</span><span class="nav-txt">Monthly</span></button>
+    <button class="nav-item"        data-tab="fy">        <span class="ni">📆</span><span class="nav-txt">Fin. Year</span></button>
+    <button class="nav-item"        data-tab="brands">    <span class="ni">🏷</span><span class="nav-txt">Brands</span></button>
+    <button class="nav-item"        data-tab="costs">     <span class="ni">💸</span><span class="nav-txt">Costs</span></button>
+  </nav>
+  <div class="sb-foot">Feb 2026 – Jul 2026</div>
+</aside>
+
+<!-- MAIN -->
+<div id="main">
+  <div class="topbar">
+    <div>
+      <div class="tb-title" id="tb-title">Overview</div>
+      <div class="tb-sub" id="tb-sub">All months combined · Feb 2026 – Jul 2026</div>
+    </div>
+    <div class="fy-pills">
+      <span class="fy-pill">FY 25-26</span>
+      <span class="fy-pill">FY 26-27</span>
+    </div>
+  </div>
+
+  <div id="content">
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="tab-overview">
+      <div class="sec-h">Key Metrics by Financial Year</div>
+      <div class="kpi-grid" id="ov-kpis"></div>
+      <div class="chart-row chart-row-2">
+        <div class="chart-card">
+          <div class="cc-title">Monthly Commission vs Net Profit</div>
+          <div class="cc-sub">Commission earned (amber) vs net profit after all deductions (line)</div>
+          <div class="cc-wrap" style="height:240px"><canvas id="ov-bar"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="cc-title">Cost Breakdown</div>
+          <div class="cc-sub">How commission is distributed across expenses</div>
+          <div class="cc-wrap" style="height:160px"><canvas id="ov-donut"></canvas></div>
+          <div class="dl" id="ov-donut-legend"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ MONTHLY VIEW ══ -->
+    <div class="tab-pane" id="tab-monthly">
+      <div class="sec-h">Select Month</div>
+      <div class="month-tabs" id="m-tabs"></div>
+      <div class="kpi-grid-4" id="m-kpis"></div>
+      <div class="chart-row chart-row-2">
+        <div class="chart-card">
+          <div class="cc-title" id="m-bar-title">Monthly Breakdown</div>
+          <div class="cc-sub">Income vs outgoings for selected month</div>
+          <div class="cc-wrap" style="height:240px"><canvas id="m-bar"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="cc-title">Comparison — All Months</div>
+          <div class="cc-sub">Commission vs costs vs net profit</div>
+          <div class="cc-wrap" style="height:240px"><canvas id="m-compare"></canvas></div>
+        </div>
+      </div>
+      <div style="background:#F0F9FF;border:1px solid #BFDBFE;border-radius:9px;padding:9px 14px;font-size:11px;color:#1E40AF;margin-bottom:14px;font-weight:600">📐 Formula: Net Profit = Gross Income − Salary − TDS Paid &nbsp;|&nbsp; Gross Income = Commission + Buyer Less + Med Less</div>
+      <div class="sec-h">Monthly Detail Table</div>
+      <div class="tbl-card"><div class="tbl-scroll">
+        <table>
+          <thead><tr>
+            <th>Month</th><th>FY</th><th>Brands</th>
+            <th class="num">Commission</th><th class="num">Buyer Less</th>
+            <th class="num">Med Less</th><th class="num">Gross Profit</th>
+            <th class="num">Salary</th><th class="num">TDS Paid</th>
+            <th class="num">Net Profit</th>
+          </tr></thead>
+          <tbody id="m-table-body"></tbody>
+          <tfoot id="m-table-foot"></tfoot>
+        </table>
+      </div></div>
+    </div>
+
+    <!-- ══ FINANCIAL YEAR ══ -->
+    <div class="tab-pane" id="tab-fy">
+      <div class="sec-h">FY Comparison — 2025-26 vs 2026-27</div>
+      <div class="fy-grid" id="fy-cards"></div>
+      <div class="chart-row chart-row-2">
+        <div class="chart-card">
+          <div class="cc-title">FY Commission vs Costs</div>
+          <div class="cc-sub">Side-by-side FY comparison of income and major costs</div>
+          <div class="cc-wrap" style="height:260px"><canvas id="fy-bar"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="cc-title">Monthly Net Profit by FY</div>
+          <div class="cc-sub">Month-wise trend within each financial year</div>
+          <div class="cc-wrap" style="height:260px"><canvas id="fy-line"></canvas></div>
+        </div>
+      </div>
+      <div class="sec-h">FY Summary Table</div>
+      <div class="tbl-card"><div class="tbl-scroll">
+        <table><thead><tr>
+          <th>Financial Year</th><th class="num">Months</th>
+          <th class="num">Total Bill</th><th class="num">Commission</th>
+          <th class="num">Buyer Less ✦</th><th class="num">Med Less ✦</th>
+          <th class="num">Gross Income</th><th class="num">Salary</th>
+          <th class="num">TDS Paid</th><th class="num">Net P&L</th>
+        </tr></thead>
+        <tbody id="fy-table-body"></tbody></table>
+      </div></div>
+    </div>
+
+    <!-- ══ BRANDS ══ -->
+    <div class="tab-pane" id="tab-brands">
+      <div class="sec-h">Filter</div>
+      <div class="fy-tabs" id="brand-fy-tabs">
+        <button class="fytab active" data-fy="all">All Months</button>
+        <button class="fytab" data-fy="25-26">FY 25-26</button>
+        <button class="fytab" data-fy="26-27">FY 26-27</button>
+      </div>
+      <div class="chart-card" style="margin-bottom:12px">
+        <div class="cc-title">Top 15 Brands by Net Contribution</div>
+        <div class="cc-sub">Commission − Buyer Less − Med Less</div>
+        <div class="cc-wrap" style="height:340px"><canvas id="brand-bar"></canvas></div>
+      </div>
+      <div class="sec-h">Brand Detail Table</div>
+      <div class="tbl-card"><div class="tbl-scroll">
+        <table><thead><tr>
+          <th>#</th><th>Brand</th>
+          <th class="num">Total Bill</th><th class="num">Commission</th>
+          <th class="num">Buyer Less</th><th class="num">Med Less</th>
+          <th class="num">Net Contribution</th>
+        </tr></thead>
+        <tbody id="brand-table-body"></tbody></table>
+      </div></div>
+    </div>
+
+    <!-- ══ COST ANALYSIS ══ -->
+    <div class="tab-pane" id="tab-costs">
+      <div class="sec-h">Cost Breakdown by Financial Year</div>
+      <div class="kpi-grid" id="cost-kpis"></div>
+      <div class="chart-row chart-row-2">
+        <div class="chart-card">
+          <div class="cc-title">Monthly Cost Trend</div>
+          <div class="cc-sub">Salary, buyer less, med less, TDS per month</div>
+          <div class="cc-wrap" style="height:260px"><canvas id="cost-trend"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="cc-title">Cost Split by Category</div>
+          <div class="cc-sub">Proportion of each cost type across all months</div>
+          <div class="cc-wrap" style="height:180px"><canvas id="cost-donut"></canvas></div>
+          <div class="dl" id="cost-donut-legend"></div>
+        </div>
+      </div>
+      <div class="sec-h">Monthly Cost Detail</div>
+      <div class="tbl-card"><div class="tbl-scroll">
+        <table><thead><tr>
+          <th>Month</th><th>FY</th>
+          <th class="num">Commission</th><th class="num">Buyer Less</th>
+          <th class="num">Med Less</th><th class="num">Gross Income</th>
+          <th class="num">Salary</th><th class="num">TDS Paid</th>
+          <th class="num">Salary+TDS</th><th class="num">Margin %</th>
+        </tr></thead>
+        <tbody id="cost-table-body"></tbody></table>
+      </div></div>
+    </div>
+
+  </div><!-- #content -->
+</div><!-- #main -->
+
+<script>
+// ── DATA ─────────────────────────────────────────────────────
+const MONTHLY = [
+  {m:"Feb 2026",fy:"25-26",bill:2687331,tds_b:53747,comm:211540,buyer:48380,med:39442,gross:299362,sal:314000,tds:53746,net:-68384, brands:41},
+  {m:"Mar 2026",fy:"25-26",bill:3826557,tds_b:76531,comm:348843,buyer:86023,med:93934,gross:528800,sal:340000,tds:76531,net:112269, brands:52},
+  {m:"Apr 2026",fy:"26-27",bill:4421774,tds_b:88435,comm:205838,buyer:54807,med:71423,gross:332068,sal:358400,tds:88435,net:-114767,brands:33},
+  {m:"May 2026",fy:"26-27",bill:2553119,tds_b:51062,comm:208890,buyer:32679,med:35520,gross:277089,sal:327000,tds:51062,net:-100973,brands:32},
+  {m:"Jun 2026",fy:"26-27",bill:6476162,tds_b:129523,comm:380420,buyer:46019,med:60697,gross:487136,sal:313356,tds:129523,net:44257,  brands:37},
+  {m:"Jul 2026",fy:"26-27",bill:2071594,tds_b:41432,comm:53420, buyer:19671,med:35682,gross:108773,sal:301000,tds:41431,net:-233658,brands:26},
+];
+
+const BRANDS_ALL = [
+  {name:"SUPERYOU",  bill:1013736,comm:114310,buyer:38266,med:36142,net:188718,fy:"both"},
+  {name:"ASAYA",     bill:1377332,comm:139188,buyer:9501, med:4558, net:153247,fy:"both"},
+  {name:"INNOVIST",  bill:873143, comm:131170,buyer:10594,med:6621, net:148385,fy:"both"},
+  {name:"RENEE",     bill:1113744,comm:90800, buyer:30926,med:5495, net:127221,fy:"both"},
+  {name:"OSCAR",     bill:624131, comm:103080,buyer:0,    med:-7415,net:95665, fy:"25-26"},
+  {name:"KLEENEST",  bill:1018572,comm:61190, buyer:6800, med:15159,net:83149, fy:"26-27"},
+  {name:"GUSH",      bill:520670, comm:56100, buyer:6549, med:11873,net:74522, fy:"both"},
+  {name:"MOXIE",     bill:1448534,comm:57780, buyer:9318, med:4173, net:71271, fy:"both"},
+  {name:"CC",        bill:316367, comm:55200, buyer:11065,med:0,    net:66265, fy:"26-27"},
+  {name:"CLAYCO",    bill:674522, comm:41260, buyer:7491, med:13300,net:62051, fy:"both"},
+  {name:"NUTTY ORG", bill:403919, comm:38490, buyer:10152,med:0,    net:48642, fy:"both"},
+  {name:"NATURALI",  bill:225779, comm:35070, buyer:3327, med:1380, net:39777, fy:"both"},
+  {name:"HOMEWIZ",   bill:423160, comm:30080, buyer:2078, med:7097, net:39255, fy:"both"},
+  {name:"TOO YUMM",  bill:202284, comm:33240, buyer:490,  med:-4850,net:28880, fy:"both"},
+  {name:"FARM DIDI", bill:149265, comm:21240, buyer:249,  med:-2059,net:19430, fy:"26-27"},
+];
+
+// FY totals computed from MONTHLY
+// Formula: Gross = Comm + BuyerLess + MedLess  |  Net = Gross - Salary - TDS
+// BuyerLess and MedLess are INCOME — brand reimburses full bill; the "less" stays with MCS
+const FY = {};
+for (const m of MONTHLY) {
+  if (!FY[m.fy]) FY[m.fy]={months:0,bill:0,comm:0,buyer:0,med:0,gross:0,sal:0,tds:0,net:0};
+  const f=FY[m.fy];
+  f.months++; f.bill+=m.bill; f.comm+=m.comm; f.buyer+=m.buyer;
+  f.med+=m.med; f.gross+=m.gross; f.sal+=m.sal; f.tds+=m.tds; f.net+=m.net;
+}
+
+// ── HELPERS ───────────────────────────────────────────────────
+const inr = n => '₹'+Math.abs(Math.round(n)).toLocaleString('en-IN');
+const sinr= n => (n<0?'−':'')+inr(n);
+const lkh = n => {const a=Math.abs(n); return (n<0?'−':'')+(a>=10000000?(a/10000000).toFixed(1)+'Cr':(a/100000).toFixed(1)+'L');};
+const pct = (a,b) => b ? ((a/b)*100).toFixed(1)+'%' : '—';
+const COLORS=['#F59E0B','#2563EB','#7C3AED','#059669','#DC2626','#0891B2','#D97706','#1D4ED8','#6D28D9','#047857','#B91C1C','#0369A1','#92400E','#0F766E','#92400E'];
+const tipBase={backgroundColor:'#fff',borderColor:'rgba(0,0,0,.1)',borderWidth:1,titleColor:'#0F172A',bodyColor:'#64748B',padding:10};
+const gridCol='rgba(0,0,0,.05)';
+let charts={};
+
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function mkChart(id,...args){destroyChart(id);charts[id]=new Chart(document.getElementById(id),...args);return charts[id];}
+
+// FY display helpers (used in multiple sections)
+const fyOrder  = ['25-26','26-27'];
+const fyLabel  = {'25-26':'FY 2025-26  ·  Feb & Mar 2026','26-27':'FY 2026-27  ·  Apr – Jul 2026'};
+const fyAccent = {'25-26':'#2563EB','26-27':'#059669'};
+
+// ── NAVIGATION ────────────────────────────────────────────────
+const TITLES={overview:'Overview',monthly:'Monthly View',fy:'Financial Year',brands:'Brand Performance',costs:'Cost Analysis'};
+const SUBS={
+  overview:'All months combined · Feb 2026 – Jul 2026',
+  monthly:'Month-by-month breakdown',
+  fy:'FY 2025-26 vs FY 2026-27 comparison',
+  brands:'Brand-wise contribution analysis',
+  costs:'Detailed expense breakdown',
+};
+let activeTab='overview';
+
+document.querySelectorAll('.nav-item').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const tab=btn.dataset.tab;
+    document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+    document.getElementById('tab-'+tab).classList.add('active');
+    document.getElementById('tb-title').textContent=TITLES[tab];
+    document.getElementById('tb-sub').textContent=SUBS[tab];
+    activeTab=tab;
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
+// OVERVIEW
+// ══════════════════════════════════════════════════════════════
+(function(){
+  // FY-split KPIs — no combined totals since data spans two separate financial years
+  function fyKpiRow(fy) {
+    const f = FY[fy];
+    const kpis = [
+      {lbl:'Commission',   val:f.comm,  sub:'Service fees earned',  ac:'#F59E0B'},
+      {lbl:'Buyer Less',   val:f.buyer, sub:'Income from buyer less', ac:'#059669'},
+      {lbl:'Med Less',     val:f.med,   sub:'Income from med less',  ac:'#0891B2'},
+      {lbl:'Gross Profit', val:f.gross, sub:'Comm + Buyer + Med Less',ac:f.gross>=0?'#059669':'#DC2626'},
+      {lbl:'Salary Paid',  val:f.sal,   sub:'Team payments',         ac:'#7C3AED'},
+      {lbl:'TDS Paid',     val:f.tds,   sub:'Advance tax',           ac:'#64748B'},
+      {lbl:'Net P&L',      val:f.net,   sub:'After all deductions',  ac:f.net>=0?'#059669':'#DC2626'},
+    ];
+    return `<div style="margin-bottom:18px">
+      <div style="font-size:11px;font-weight:700;color:${fyAccent[fy]};text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+        <span style="width:10px;height:10px;border-radius:50%;background:${fyAccent[fy]};display:inline-block"></span>${fyLabel[fy]}
+      </div>
+      <div class="kpi-grid">
+        ${kpis.map(k=>`<div class="kpi" style="--ac:${k.ac}">
+          <div class="kpi-lbl">${k.lbl}</div>
+          <div class="kpi-val" style="color:${k.val<0&&(k.lbl==='Net P&L'||k.lbl==='Gross Profit')?'#DC2626':'inherit'}">${lkh(k.val)}</div>
+          <div class="kpi-sub">${k.sub}</div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+  document.getElementById('ov-kpis').innerHTML = fyOrder.map(fyKpiRow).join(
+    '<div style="height:1px;background:#E2E8F0;margin:4px 0 20px"></div>'
+  );
+
+  const labs=MONTHLY.map(m=>m.m.replace(' 20',"'"));
+  mkChart('ov-bar',{
+    type:'bar',
+    data:{labels:labs,datasets:[
+      {label:'Gross Income (Comm+Less)',data:MONTHLY.map(m=>m.gross),backgroundColor:'rgba(245,158,11,.85)',borderRadius:4,yAxisID:'y'},
+      {label:'Net Profit/Loss',data:MONTHLY.map(m=>m.net),type:'line',borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.08)',borderWidth:2.5,tension:.3,fill:false,pointRadius:5,pointBackgroundColor:MONTHLY.map(m=>m.net>=0?'#059669':'#DC2626'),yAxisID:'y'},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:10}},tooltip:tipBase},
+      scales:{y:{grid:{color:gridCol},ticks:{color:'#64748B',callback:v=>'₹'+Math.round(v/1000)+'K'}}}}
+  });
+
+  // Cost donut: only actual outgoings — Salary and TDS
+  // Buyer Less and Med Less are INCOME, not costs
+  const fyAll25 = FY['25-26'] || {sal:0,tds:0};
+  const fyAll26 = FY['26-27'] || {sal:0,tds:0};
+  const dd=[
+    {lbl:'Salary FY 25-26', val:fyAll25.sal, col:'#1E40AF'},
+    {lbl:'Salary FY 26-27', val:fyAll26.sal, col:'#7C3AED'},
+    {lbl:'TDS FY 25-26',    val:fyAll25.tds, col:'#6B7280'},
+    {lbl:'TDS FY 26-27',    val:fyAll26.tds, col:'#374151'},
+  ];
+  mkChart('ov-donut',{type:'doughnut',data:{labels:dd.map(d=>d.lbl),
+    datasets:[{data:dd.map(d=>d.val),backgroundColor:dd.map(d=>d.col),borderWidth:2,borderColor:'#fff',hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:tipBase}}});
+  document.getElementById('ov-donut-legend').innerHTML=dd.map(d=>`
+    <div class="dl-row"><div style="display:flex;align-items:center;gap:6px"><div class="dl-dot" style="background:${d.col}"></div><span style="color:#64748B">${d.lbl}</span></div>
+    <span class="bold">${inr(d.val)}</span></div>`).join('');
+})();
+
+// ══════════════════════════════════════════════════════════════
+// MONTHLY VIEW
+// ══════════════════════════════════════════════════════════════
+let selMonth=0;
+
+(function(){
+  const tabs=document.getElementById('m-tabs');
+  MONTHLY.forEach((m,i)=>{
+    const b=document.createElement('button');
+    b.className='mtab'+(i===0?' active':'');
+    b.textContent=m.m.replace(' 2026','');
+    b.onclick=()=>{selMonth=i;renderMonthly();tabs.querySelectorAll('.mtab').forEach(x=>x.classList.remove('active'));b.classList.add('active');};
+    tabs.appendChild(b);
+  });
+
+  // Monthly comparison chart (all months, static)
+  const labs=MONTHLY.map(m=>m.m.replace(' 20',"'"));
+  mkChart('m-compare',{type:'bar',
+    data:{labels:labs,datasets:[
+      {label:'Commission',data:MONTHLY.map(m=>m.comm),backgroundColor:'rgba(245,158,11,.8)',borderRadius:3},
+      {label:'Salary',    data:MONTHLY.map(m=>m.sal), backgroundColor:'rgba(109,40,217,.7)',borderRadius:3},
+      {label:'Buyer+Med', data:MONTHLY.map(m=>m.buyer+m.med),backgroundColor:'rgba(220,38,38,.7)',borderRadius:3},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:8}},tooltip:tipBase},
+      scales:{x:{stacked:false,grid:{display:false},ticks:{color:'#64748B'}},
+              y:{grid:{color:gridCol},ticks:{color:'#64748B',callback:v=>'₹'+Math.round(v/1000)+'K'}}}}
+  });
+
+  // Full table
+  document.getElementById('m-table-body').innerHTML=MONTHLY.map(m=>`
+    <tr>
+      <td class="bold">${m.m}</td>
+      <td><span class="pill pa">FY ${m.fy}</span></td>
+      <td style="text-align:center;color:#64748B">${m.brands}</td>
+      <td class="num" style="color:#F59E0B;font-weight:700">${inr(m.comm)}</td>
+      <td class="num" style="color:#059669">${inr(m.buyer)}</td>
+      <td class="num" style="color:#0891B2">${inr(m.med)}</td>
+      <td class="num" style="font-weight:700;color:${m.gross>=0?'#059669':'#DC2626'}">${sinr(m.gross)}</td>
+      <td class="num" style="color:#7C3AED">${inr(m.sal)}</td>
+      <td class="num" style="color:#64748B">${inr(m.tds)}</td>
+      <td class="num"><span class="pill ${m.net>=0?'pg':'pr'}">${sinr(m.net)}</span></td>
+    </tr>`).join('');
+  document.getElementById('m-table-foot').innerHTML=`
+    <tr style="background:#F8FAFC;border-top:2px solid var(--border)">
+      <td class="bold" colspan="3">TOTAL</td>
+      <td class="num bold" style="color:#F59E0B">${inr(Object.values(FY).reduce((s,f)=>s+f.comm,0))}</td>
+      <td class="num bold" style="color:#059669">${inr(Object.values(FY).reduce((s,f)=>s+f.buyer,0))}</td>
+      <td class="num bold" style="color:#0891B2">${inr(Object.values(FY).reduce((s,f)=>s+f.med,0))}</td>
+      <td class="num bold" style="color:#059669">${sinr(Object.values(FY).reduce((s,f)=>s+f.gross,0))}</td>
+      <td class="num bold" style="color:#7C3AED">${inr(Object.values(FY).reduce((s,f)=>s+f.sal,0))}</td>
+      <td class="num bold" style="color:#64748B">${inr(Object.values(FY).reduce((s,f)=>s+f.tds,0))}</td>
+      <td class="num">${(()=>{const n=Object.values(FY).reduce((s,f)=>s+f.net,0);return `<span class="pill ${n>=0?'pg':'pr'} bold">${sinr(n)}</span>`;})()}</td>
+    </tr>`;
+  renderMonthly();
+})();
+
+function renderMonthly(){
+  const m=MONTHLY[selMonth];
+  document.getElementById('m-bar-title').textContent=m.m+' — Breakdown';
+  // Formula: Net = Gross Income (Comm+BuyerLess+MedLess) - Salary - TDS Paid
+  const k4=[
+    {lbl:'Gross Income',  val:m.gross, sub:'Comm + Buyer Less + Med Less', ac:m.gross>=0?'#059669':'#DC2626'},
+    {lbl:'( −) Salary',   val:m.sal,   sub:'Team payments deducted',       ac:'#7C3AED'},
+    {lbl:'( −) TDS Paid', val:m.tds,   sub:'Advance tax deducted',         ac:'#64748B'},
+    {lbl:'Net Profit',    val:m.net,   sub:'Gross − Salary − TDS',         ac:m.net>=0?'#059669':'#DC2626'},
+  ];
+  document.getElementById('m-kpis').innerHTML=k4.map((k,i)=>`
+    <div class="kpi" style="--ac:${k.ac};${i===3?'border:2px solid '+k.ac:''}">
+      <div class="kpi-lbl">${k.lbl}</div>
+      <div class="kpi-val" style="color:${k.val<0&&(i===0||i===3)?'#DC2626':'var(--text)'}">${lkh(k.val)}</div>
+      <div class="kpi-sub" style="font-size:9px">${k.sub}</div>
+    </div>`).join('');
+
+  destroyChart('m-bar');
+  charts['m-bar']=new Chart(document.getElementById('m-bar'),{type:'bar',
+    data:{
+      labels:['Gross Income','− Salary','− TDS Paid','= Net Profit'],
+      datasets:[{
+        data:[m.gross, -m.sal, -m.tds, m.net],
+        backgroundColor:['#2563EB','rgba(124,58,237,.8)','rgba(100,116,139,.8)',m.net>=0?'#059669':'#DC2626'],
+        borderRadius:5,borderWidth:0,
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{...tipBase,callbacks:{
+          label:ctx=>{
+            const v=ctx.parsed.y;
+            const pfx=['Gross Income','Salary Paid','TDS Paid','Net Profit'];
+            return ' '+pfx[ctx.dataIndex]+': '+sinr(Math.abs(v));
+          }
+        }}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#64748B',font:{size:10,weight:'bold'}}},
+        y:{grid:{color:gridCol},ticks:{color:'#64748B',callback:v=>'₹'+Math.round(v/1000)+'K'},
+           afterDataLimits(s){const r=Math.max(Math.abs(s.max),Math.abs(s.min));s.max=r*1.1;s.min=-r*0.3;}}
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// FINANCIAL YEAR VIEW
+// ══════════════════════════════════════════════════════════════
+(function(){
+  const fyNames={'25-26':'FY 2025-26','26-27':'FY 2026-27'};
+  const fyColors={'25-26':'#2563EB','26-27':'#059669'};
+  const fyMonths={'25-26':['Feb','Mar'],'26-27':['Apr','May','Jun','Jul']};
+
+  // FY summary cards
+  document.getElementById('fy-cards').innerHTML=Object.entries(FY).map(([fy,f])=>`
+    <div class="fy-card">
+      <div class="fy-card-title"><span style="width:10px;height:10px;border-radius:50%;background:${fyColors[fy]};display:inline-block"></span>${fyNames[fy]}<span style="font-size:10px;color:#94A3B8">${fyMonths[fy].join(', ')}</span></div>
+      ${[['Commission',f.comm,'#F59E0B'],['Buyer Less (Income)',f.buyer,'#059669'],['Med Less (Income)',f.med,'#0891B2'],
+         ['Gross Income (C+BL+ML)',f.gross,f.gross>=0?'#059669':'#DC2626'],['(−) Salary',f.sal,'#7C3AED'],
+         ['(−) TDS Paid',f.tds,'#64748B'],['Net P&L (G−S−T)',f.net,f.net>=0?'#059669':'#DC2626']]
+        .map(([l,v,c])=>`<div class="fy-row"><span class="fy-row-lbl">${l}</span><span class="fy-row-val" style="color:${c}">${sinr(v)}</span></div>`).join('')}
+    </div>`).join('');
+
+  // FY comparison bar
+  const fyKeys=Object.keys(FY);
+  mkChart('fy-bar',{type:'bar',
+    data:{labels:['Gross Income','Salary Paid','TDS Paid','Net Profit'],
+    datasets:fyKeys.map((fy,i)=>({label:fyNames[fy],
+      data:[FY[fy].gross, FY[fy].sal, FY[fy].tds, FY[fy].net],
+      backgroundColor:i===0?'rgba(37,99,235,.8)':'rgba(5,150,105,.8)',borderRadius:4}))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:10}},tooltip:tipBase},
+      scales:{x:{grid:{display:false},ticks:{color:'#64748B'}},
+              y:{grid:{color:gridCol},ticks:{color:'#64748B',callback:v=>'₹'+Math.round(v/1000)+'K'}}}}
+  });
+
+  // Monthly net profit colored by FY
+  mkChart('fy-line',{type:'line',
+    data:{labels:MONTHLY.map(m=>m.m.replace(' 2026','')),
+    datasets:[
+      {label:'FY 25-26',data:MONTHLY.filter(m=>m.fy==='25-26').map(m=>m.net),borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.08)',tension:.3,fill:true,pointRadius:5,borderWidth:2.5},
+      {label:'FY 26-27',data:[null,null,...MONTHLY.filter(m=>m.fy==='26-27').map(m=>m.net)],borderColor:'#059669',backgroundColor:'rgba(5,150,105,.08)',tension:.3,fill:true,pointRadius:5,borderWidth:2.5},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:10}},tooltip:tipBase},
+      scales:{x:{grid:{color:gridCol},ticks:{color:'#64748B'}},
+              y:{grid:{color:gridCol},ticks:{color:'#64748B',callback:v=>'₹'+Math.round(v/1000)+'K'}}}}
+  });
+
+  // FY table
+  document.getElementById('fy-table-body').innerHTML=Object.entries(FY).map(([fy,f])=>`
+    <tr>
+      <td class="bold" style="color:${fyColors[fy]}">${fyNames[fy]}</td>
+      <td class="num">${f.months}</td>
+      <td class="num">${inr(f.bill)}</td>
+      <td class="num" style="color:#F59E0B;font-weight:700">${inr(f.comm)}</td>
+      <td class="num" style="color:#DC2626">${inr(f.buyer)}</td>
+      <td class="num" style="color:#0891B2">${inr(f.med)}</td>
+      <td class="num" style="font-weight:600">${sinr(f.gross)}</td>
+      <td class="num" style="color:#7C3AED">${inr(f.sal)}</td>
+      <td class="num" style="color:#64748B">${inr(f.tds)}</td>
+      <td class="num"><span class="pill ${f.net>=0?'pg':'pr'}">${sinr(f.net)}</span></td>
+    </tr>`).join('');
+})();
+
+// ══════════════════════════════════════════════════════════════
+// BRANDS
+// ══════════════════════════════════════════════════════════════
+let brandFY='all';
+document.querySelectorAll('#brand-fy-tabs .fytab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    brandFY=btn.dataset.fy;
+    document.querySelectorAll('#brand-fy-tabs .fytab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderBrands();
+  });
+});
+
+function renderBrands(){
+  const filtered=brandFY==='all'?BRANDS_ALL:BRANDS_ALL.filter(b=>b.fy===brandFY||b.fy==='both');
+  const top15=filtered.slice(0,15);
+
+  destroyChart('brand-bar');
+  charts['brand-bar']=new Chart(document.getElementById('brand-bar'),{type:'bar',
+    data:{labels:top15.map(b=>b.name),
+    datasets:[{label:'Net Contribution',data:top15.map(b=>b.net),
+      backgroundColor:top15.map((_,i)=>COLORS[i%COLORS.length]),borderRadius:4,borderWidth:0}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{...tipBase,callbacks:{label:ctx=>' Net: ₹'+ctx.parsed.x.toLocaleString('en-IN')}}},
+      scales:{x:{grid:{color:gridCol},ticks:{color:'#64748B',callback:v=>'₹'+Math.round(v/1000)+'K'}},
+              y:{grid:{display:false},ticks:{color:'#374151',font:{size:10}}}}}
+  });
+
+  document.getElementById('brand-table-body').innerHTML=top15.map((b,i)=>`
+    <tr>
+      <td style="color:#94A3B8;font-weight:600">${i+1}</td>
+      <td class="bold">${b.name}</td>
+      <td class="num">${inr(b.bill)}</td>
+      <td class="num" style="color:#F59E0B;font-weight:700">${inr(b.comm)}</td>
+      <td class="num" style="color:#DC2626">${b.buyer>0?inr(b.buyer):'—'}</td>
+      <td class="num" style="color:#0891B2">${b.med>0?inr(b.med):'—'}</td>
+      <td class="num"><span class="pill ${b.net>=0?'pg':'pr'}">${inr(b.net)}</span></td>
+    </tr>`).join('');
+}
+renderBrands();
+
+// ══════════════════════════════════════════════════════════════
+// COST ANALYSIS
+// ══════════════════════════════════════════════════════════════
+(function(){
+  // Cost KPIs split by FY — no combined totals
+  function costKpiRow(fy) {
+    const f = FY[fy];
+    const totalCosts = f.sal + f.tds + f.buyer + f.med;
+    const ck = [
+      {lbl:'Commission',   val:f.comm,  sub:'Income earned',     ac:'#F59E0B'},
+      {lbl:'Salary & Team',val:f.sal,   sub:'Team payments',     ac:'#7C3AED'},
+      {lbl:'Buyer Less',   val:f.buyer, sub:'Income from buyer less', ac:'#059669'},
+      {lbl:'Med Less',     val:f.med,   sub:'Income from med less',   ac:'#0891B2'},
+      {lbl:'TDS Paid',     val:f.tds,   sub:'Advance tax',       ac:'#64748B'},
+      {lbl:'Total Expenses',val:f.sal+f.tds,sub:'Salary + TDS only',ac:'#0F172A'},
+    ];
+    return `<div style="margin-bottom:18px">
+      <div style="font-size:11px;font-weight:700;color:${fyAccent[fy]};text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+        <span style="width:10px;height:10px;border-radius:50%;background:${fyAccent[fy]};display:inline-block"></span>${fyLabel[fy]}
+      </div>
+      <div class="kpi-grid">
+        ${ck.map(k=>`<div class="kpi" style="--ac:${k.ac}">
+          <div class="kpi-lbl">${k.lbl}</div>
+          <div class="kpi-val">${lkh(k.val)}</div>
+          <div class="kpi-sub">${k.sub}</div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+  document.getElementById('cost-kpis').innerHTML = fyOrder.map(costKpiRow).join(
+    '<div style="height:1px;background:#E2E8F0;margin:4px 0 20px"></div>'
+  );
+
+  mkChart('cost-trend',{type:'bar',
+    data:{labels:MONTHLY.map(m=>m.m.replace(' 20',"'")),
+    datasets:[
+      {label:'Salary',    data:MONTHLY.map(m=>m.sal),  backgroundColor:'rgba(109,40,217,.8)',borderRadius:3},
+      {label:'Buyer Less',data:MONTHLY.map(m=>m.buyer),backgroundColor:'rgba(220,38,38,.7)', borderRadius:3},
+      {label:'Med Less',  data:MONTHLY.map(m=>m.med),  backgroundColor:'rgba(8,145,178,.7)', borderRadius:3},
+      {label:'TDS Paid',  data:MONTHLY.map(m=>m.tds),  backgroundColor:'rgba(100,116,139,.6)',borderRadius:3},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:8}},tooltip:tipBase},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{color:'#64748B'}},
+              y:{stacked:true,grid:{color:gridCol},ticks:{color:'#64748B',callback:v=>'₹'+Math.round(v/1000)+'K'}}}}
+  });
+
+  // Costs = Salary + TDS only (Buyer/Med Less are income, not costs)
+  const allSal  = Object.values(FY).reduce((s,f)=>s+f.sal, 0);
+  const allTds  = Object.values(FY).reduce((s,f)=>s+f.tds, 0);
+  const cd=[{lbl:'Salary FY 25-26',val:FY['25-26']?.sal||0,col:'#1E40AF'},
+            {lbl:'Salary FY 26-27',val:FY['26-27']?.sal||0,col:'#7C3AED'},
+            {lbl:'TDS FY 25-26',   val:FY['25-26']?.tds||0,col:'#6B7280'},
+            {lbl:'TDS FY 26-27',   val:FY['26-27']?.tds||0,col:'#374151'}];
+  mkChart('cost-donut',{type:'doughnut',
+    data:{labels:cd.map(d=>d.lbl),datasets:[{data:cd.map(d=>d.val),backgroundColor:cd.map(d=>d.col),borderWidth:2,borderColor:'#fff',hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:tipBase}}});
+  document.getElementById('cost-donut-legend').innerHTML=cd.map(d=>`
+    <div class="dl-row"><div style="display:flex;align-items:center;gap:6px"><div class="dl-dot" style="background:${d.col}"></div><span style="color:#64748B">${d.lbl}</span></div>
+    <span class="bold">${inr(d.val)}</span></div>`).join('');
+
+  document.getElementById('cost-table-body').innerHTML=MONTHLY.map(m=>{
+    const tc=m.sal+m.tds+m.buyer+m.med;
+    const margin=m.comm>0?(m.gross/m.comm*100).toFixed(1)+'%':'—';
+    return `<tr>
+      <td class="bold">${m.m}</td>
+      <td><span class="pill pa">FY ${m.fy}</span></td>
+      <td class="num" style="color:#F59E0B;font-weight:700">${inr(m.comm)}</td>
+      <td class="num" style="color:#059669">${inr(m.buyer)}</td>
+      <td class="num" style="color:#0891B2">${inr(m.med)}</td>
+      <td class="num bold" style="color:#2563EB">${inr(m.gross)}</td>
+      <td class="num" style="color:#7C3AED">${inr(m.sal)}</td>
+      <td class="num" style="color:#64748B">${inr(m.tds)}</td>
+      <td class="num bold" style="color:#7C3AED">${inr(m.sal+m.tds)}</td>
+      <td class="num" style="color:#059669;font-weight:700">${margin}</td>
+    </tr>`;}).join('');
+})();
+</script>
+</body>
+</html>
